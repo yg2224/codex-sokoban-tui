@@ -547,4 +547,9 @@ async def test_resize_propagates_to_terminal_adapter() -> None:
         await pilot.resize_terminal(100, 30)
         await pilot.pause()
 
+        codex_pane = pilot.app.query_one("#codex-pane")
         assert adapter.resize_calls
+        assert adapter.resize_calls[-1] == (
+            codex_pane.size.width,
+            max(1, codex_pane.size.height - 1),
+        )

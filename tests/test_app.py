@@ -2,6 +2,8 @@ import threading
 import time
 from collections.abc import Callable
 
+import pytest
+
 from codex_sokoban_tui.sokoban import load_level
 from codex_sokoban_tui.terminal_adapter import TerminalAdapter, _PtyBackend
 
@@ -112,6 +114,61 @@ class RecordingTerminalAdapter:
         return len(data)
 
 
+class FakeAppAdapter:
+    def __init__(
+        self,
+        outputs: list[str] | None = None,
+        *,
+        status: str = "running",
+    ) -> None:
+        self.outputs = list(outputs or [])
+        self.inputs: list[bytes] = []
+        self.start_calls: list[tuple[int, int]] = []
+        self.resize_calls: list[tuple[int, int]] = []
+        self.terminated = False
+        self.status = status
+        self._lines: list[str] = []
+
+    def start(self, columns: int, rows: int) -> bool:
+        self.start_calls.append((columns, rows))
+        self.status = "running"
+        return True
+
+    def send_input(self, data: bytes) -> int:
+        self.inputs.append(data)
+        return len(data)
+
+    def poll_output(self) -> str:
+        if not self.outputs:
+            return ""
+
+        text = self.outputs.pop(0)
+        self._append_text(text)
+        return text
+
+    def resize(self, columns: int, rows: int) -> None:
+        self.resize_calls.append((columns, rows))
+
+    def terminate(self) -> None:
+        self.terminated = True
+        self.status = "terminated"
+
+    def render_lines(self) -> list[str]:
+        if not self._lines:
+            return []
+        return self._lines.copy()
+
+    def _append_text(self, text: str) -> None:
+        normalized = text.replace("\r\n", "\n")
+        if not self._lines:
+            self._lines.append("")
+
+        parts = normalized.split("\n")
+        self._lines[-1] += parts[0]
+        for part in parts[1:]:
+            self._lines.append(part)
+
+
 def make_test_game():
     return load_level(
         [
@@ -120,6 +177,33 @@ def make_test_game():
             "#####",
         ]
     )
+
+
+def renderable_text(widget) -> str:
+    renderable = widget.renderable
+    return renderable.plain if hasattr(renderable, "plain") else str(renderable)
+
+
+def make_test_app(
+    *,
+    outputs: list[str] | None = None,
+    command: list[str] | None = None,
+):
+    from codex_sokoban_tui.app import CodexSokobanApp
+
+    adapter = FakeAppAdapter(outputs=outputs)
+    commands: list[list[str]] = []
+
+    def adapter_factory(command_value: list[str]) -> FakeAppAdapter:
+        commands.append(list(command_value))
+        return adapter
+
+    app = CodexSokobanApp(
+        command=command,
+        adapter_factory=adapter_factory,
+        poll_interval=0.01,
+    )
+    return app, adapter, commands
 
 
 def test_adapter_reports_missing_codex_binary() -> None:
@@ -379,3 +463,88 @@ def test_widget_rendering_exposes_focus_and_status_for_shell_consumption() -> No
         terminal_status="running",
     )
     assert status_line == "Focus: GAME | Moves: 1 | Pushes: 1 | Codex: running"
+
+
+@pytest.mark.asyncio
+async def test_app_mounts_codex_pane_statusbar_and_sokoban_pane() -> None:
+    app, adapter, commands = make_test_app()
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert pilot.app.query_one("#codex-pane")
+        assert pilot.app.query_one("#sokoban-pane")
+        assert pilot.app.query_one("#status-bar")
+        assert commands == [["codex"]]
+        assert len(adapter.start_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_f6_switches_focus_between_codex_and_sokoban_panes() -> None:
+    app, _, _ = make_test_app()
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert pilot.app.focused is not None
+        assert pilot.app.focused.id == "codex-pane"
+
+        await pilot.press("f6")
+        await pilot.pause()
+        assert pilot.app.focused is not None
+        assert pilot.app.focused.id == "sokoban-pane"
+
+        await pilot.press("f6")
+        await pilot.pause()
+        assert pilot.app.focused is not None
+        assert pilot.app.focused.id == "codex-pane"
+
+
+@pytest.mark.asyncio
+async def test_adapter_output_eventually_appears_in_codex_pane() -> None:
+    app, _, _ = make_test_app(outputs=["codex ready"])
+
+    async with app.run_test() as pilot:
+        await pilot.pause(0.05)
+
+        codex_pane = pilot.app.query_one("#codex-pane")
+        assert "codex ready" in renderable_text(codex_pane)
+
+
+@pytest.mark.asyncio
+async def test_ctrl_c_routes_to_terminal_adapter_when_codex_pane_is_focused() -> None:
+    app, adapter, _ = make_test_app()
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("ctrl+c")
+        await pilot.pause()
+
+        assert adapter.inputs == [b"\x03"]
+
+
+@pytest.mark.asyncio
+async def test_game_input_updates_sokoban_pane_when_game_pane_is_focused() -> None:
+    app, _, _ = make_test_app()
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("f6")
+        await pilot.pause()
+        await pilot.press("right")
+        await pilot.pause()
+
+        sokoban_pane = pilot.app.query_one("#sokoban-pane")
+        status_bar = pilot.app.query_one("#status-bar")
+        assert "# @*#" in renderable_text(sokoban_pane)
+        assert "Focus: GAME | Moves: 1 | Pushes: 1" in renderable_text(status_bar)
+
+
+@pytest.mark.asyncio
+async def test_resize_propagates_to_terminal_adapter() -> None:
+    app, adapter, _ = make_test_app()
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.resize_terminal(100, 30)
+        await pilot.pause()
+
+        assert adapter.resize_calls

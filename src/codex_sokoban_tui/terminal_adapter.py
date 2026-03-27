@@ -105,6 +105,11 @@ class TerminalAdapter:
             raise RuntimeError("Terminal buffer is not initialized.")
         return self._buffer
 
+    def render_lines(self) -> list[str]:
+        if self._buffer is None:
+            return []
+        return self._buffer.render_lines()
+
     def start(self, columns: int, rows: int) -> bool:
         executable = self._command[0] if self._command else ""
         if not executable or shutil.which(executable) is None:

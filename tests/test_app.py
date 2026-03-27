@@ -1,6 +1,10 @@
 import threading
 import time
 from collections.abc import Callable
+import os
+from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -553,3 +557,30 @@ async def test_resize_propagates_to_terminal_adapter() -> None:
             codex_pane.size.width,
             max(1, codex_pane.size.height - 1),
         )
+
+
+def test_main_runs_without_editable_install_when_src_is_sibling(tmp_path: Path) -> None:
+    main_source = Path(__file__).resolve().parents[1] / "main.py"
+    project_dir = tmp_path / "project"
+    src_dir = project_dir / "src" / "codex_sokoban_tui"
+    src_dir.mkdir(parents=True)
+    (project_dir / "main.py").write_text(main_source.read_text(encoding="utf-8"), encoding="utf-8")
+    (src_dir / "__init__.py").write_text("", encoding="utf-8")
+    (src_dir / "app.py").write_text(
+        "from pathlib import Path\n"
+        "class CodexSokobanApp:\n"
+        "    def run(self):\n"
+        "        Path('ran.txt').write_text('ok', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "main.py"],
+        cwd=project_dir,
+        capture_output=True,
+        text=True,
+        env={key: value for key, value in os.environ.items() if key != "PYTHONPATH"},
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert (project_dir / "ran.txt").read_text(encoding="utf-8") == "ok"

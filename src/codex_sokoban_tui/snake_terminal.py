@@ -168,3 +168,10 @@ def main() -> None:
             time.sleep(0.1)
         else:
             time.sleep(0.05)
+
+        if os.environ.get("CODEX_SNAKE_RUN_ONCE") == "1":
+            break
+
+
+if __name__ == "__main__":
+    main()

@@ -1,4 +1,8 @@
+import os
 from random import Random
+import subprocess
+import sys
+from pathlib import Path
 
 from codex_sokoban_tui.snake import Direction, SnakeGame
 from codex_sokoban_tui.snake_terminal import map_key_to_action, render_frame
@@ -162,3 +166,23 @@ def test_reverse_direction_is_rejected_when_length_is_greater_than_one() -> None
     assert game.direction is Direction.RIGHT
     game.tick()
     assert game.snake == ((3, 2), (2, 2))
+
+
+def test_snake_terminal_module_runs_main_when_invoked_as_module() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(repo_root / "src")
+    env["CODEX_SNAKE_RUN_ONCE"] = "1"
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "codex_sokoban_tui.snake_terminal"],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+
+    assert completed.returncode == 0
+    assert "Score:" in completed.stdout

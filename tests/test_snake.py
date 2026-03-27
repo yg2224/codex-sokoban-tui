@@ -1,6 +1,7 @@
 from random import Random
 
 from codex_sokoban_tui.snake import Direction, SnakeGame
+from codex_sokoban_tui.snake_terminal import map_key_to_action, render_frame
 
 
 def test_tick_moves_head_in_current_direction() -> None:
@@ -35,6 +36,56 @@ def test_tick_increases_score_and_length_when_eating_food() -> None:
     assert game.food is not None
     assert game.food != (3, 2)
     assert game.food not in game.snake
+
+
+def test_map_key_to_action_supports_arrow_keys_and_wasd() -> None:
+    assert map_key_to_action("up") is Direction.UP
+    assert map_key_to_action("down") is Direction.DOWN
+    assert map_key_to_action("left") is Direction.LEFT
+    assert map_key_to_action("right") is Direction.RIGHT
+    assert map_key_to_action("w") is Direction.UP
+    assert map_key_to_action("a") is Direction.LEFT
+    assert map_key_to_action("s") is Direction.DOWN
+    assert map_key_to_action("d") is Direction.RIGHT
+    assert map_key_to_action("r") == "restart"
+    assert map_key_to_action("q") == "quit"
+
+
+def test_render_frame_shows_small_terminal_warning() -> None:
+    game = SnakeGame(
+        width=5,
+        height=5,
+        snake=((2, 2),),
+        direction=Direction.RIGHT,
+        rng=Random(0),
+        initial_food=(0, 0),
+        score=2,
+    )
+
+    frame = render_frame(game, width=4, height=6)
+
+    assert "too small" in frame.lower()
+    assert "need at least" in frame.lower()
+
+
+def test_render_frame_contains_score_and_border() -> None:
+    game = SnakeGame(
+        width=3,
+        height=3,
+        snake=((1, 1),),
+        direction=Direction.RIGHT,
+        rng=Random(0),
+        initial_food=(0, 0),
+        score=7,
+        game_over=False,
+    )
+
+    frame = render_frame(game, width=10, height=10)
+    lines = frame.splitlines()
+
+    assert "Score: 7" in frame
+    assert any(line.startswith("+") and line.endswith("+") for line in lines)
+    assert any(line.startswith("|") and line.endswith("|") for line in lines)
 
 
 def test_collision_with_wall_sets_game_over() -> None:

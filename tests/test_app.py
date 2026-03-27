@@ -371,12 +371,11 @@ def test_widget_rendering_exposes_focus_and_status_for_shell_consumption() -> No
     assert game_view.lines == ("#####", "#@$.#", "#####")
     assert game_view.status == "Moves: 0 | Pushes: 0"
 
+    game = make_test_game()
+    game.move("right")
     status_line = StatusBarWidget().render(
         focus=PaneFocus.GAME,
-        game=make_test_game(),
+        game=game,
         terminal_status="running",
     )
-    assert "Focus: GAME" in status_line
-    assert "Moves: 0" in status_line
-    assert "Pushes: 0" in status_line
-    assert "Codex: running" in status_line
+    assert status_line == "Focus: GAME | Moves: 1 | Pushes: 1 | Codex: running"

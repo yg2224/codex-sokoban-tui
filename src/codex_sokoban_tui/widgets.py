@@ -22,8 +22,6 @@ _MOVEMENT_KEYS: dict[str, str] = {
 
 
 class TerminalInputTarget(Protocol):
-    status: str
-
     def send_input(self, data: bytes) -> int:
         ...
 

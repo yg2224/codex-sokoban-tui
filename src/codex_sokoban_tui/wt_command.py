@@ -10,18 +10,22 @@ def build_wt_command(*, project_dir: Path, python_executable: str) -> list[str]:
     `python -m codex_sokoban_tui.snake_terminal`.
     """
     cwd = str(project_dir)
+    src_dir = project_dir / "src"
+    snake_command = f'set "PYTHONPATH={src_dir}" && {python_executable} -m codex_sokoban_tui.snake_terminal'
     return [
         "wt",
         "new-tab",
         "-d",
         cwd,
+        "cmd.exe",
+        "/k",
         "codex",
         ";",
         "split-pane",
         "-V",
         "-d",
         cwd,
-        python_executable,
-        "-m",
-        "codex_sokoban_tui.snake_terminal",
+        "cmd.exe",
+        "/k",
+        snake_command,
     ]

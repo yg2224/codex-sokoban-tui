@@ -62,15 +62,17 @@ def test_build_wt_command_left_and_right_panes() -> None:
         "new-tab",
         "-d",
         str(project_dir),
+        "cmd.exe",
+        "/k",
         "codex",
         ";",
         "split-pane",
         "-V",
         "-d",
         str(project_dir),
-        "python",
-        "-m",
-        "codex_sokoban_tui.snake_terminal",
+        "cmd.exe",
+        "/k",
+        f'set "PYTHONPATH={project_dir / "src"}" && python -m codex_sokoban_tui.snake_terminal',
     ]
 
 

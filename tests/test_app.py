@@ -2,6 +2,7 @@ import threading
 import time
 from collections.abc import Callable
 
+from codex_sokoban_tui.sokoban import load_level
 from codex_sokoban_tui.terminal_adapter import TerminalAdapter, _PtyBackend
 
 
@@ -99,6 +100,26 @@ def wait_for(predicate: Callable[[], bool], timeout: float = 1.0) -> None:
             return
         time.sleep(0.01)
     raise AssertionError("condition not met before timeout")
+
+
+class RecordingTerminalAdapter:
+    def __init__(self) -> None:
+        self.inputs: list[bytes] = []
+        self.status = "running"
+
+    def send_input(self, data: bytes) -> int:
+        self.inputs.append(data)
+        return len(data)
+
+
+def make_test_game():
+    return load_level(
+        [
+            "#####",
+            "#@$.#",
+            "#####",
+        ]
+    )
 
 
 def test_adapter_reports_missing_codex_binary() -> None:
@@ -221,3 +242,104 @@ def test_adapter_terminates_backend() -> None:
 
     assert backend.terminated is True
     assert adapter.status == "terminated"
+
+
+def test_focus_router_toggles_between_codex_and_game_with_f6() -> None:
+    from codex_sokoban_tui.focus import PaneFocus
+    from codex_sokoban_tui.widgets import InputRouter
+
+    router = InputRouter(
+        game=make_test_game(),
+        terminal_adapter=RecordingTerminalAdapter(),
+    )
+
+    assert router.focus is PaneFocus.CODEX
+    assert router.handle_key("f6") is True
+    assert router.focus is PaneFocus.GAME
+    assert router.handle_key("f6") is True
+    assert router.focus is PaneFocus.CODEX
+
+
+def test_game_keys_do_not_move_player_when_game_is_unfocused() -> None:
+    from codex_sokoban_tui.focus import PaneFocus
+    from codex_sokoban_tui.widgets import InputRouter
+
+    game = make_test_game()
+    starting_player = game.player
+    router = InputRouter(
+        game=game,
+        terminal_adapter=RecordingTerminalAdapter(),
+        focus=PaneFocus.CODEX,
+    )
+
+    assert router.handle_key("right") is False
+    assert game.player == starting_player
+    assert game.move_count == 0
+
+
+def test_game_keys_move_player_when_game_is_focused() -> None:
+    from codex_sokoban_tui.focus import PaneFocus
+    from codex_sokoban_tui.widgets import InputRouter
+
+    game = make_test_game()
+    router = InputRouter(
+        game=game,
+        terminal_adapter=RecordingTerminalAdapter(),
+        focus=PaneFocus.GAME,
+    )
+
+    assert router.handle_key("right") is True
+    assert game.player == (2, 1)
+    assert game.boxes == {(3, 1)}
+    assert game.move_count == 1
+    assert game.push_count == 1
+
+
+def test_ctrl_c_is_forwarded_to_terminal_when_codex_is_focused() -> None:
+    from codex_sokoban_tui.focus import PaneFocus
+    from codex_sokoban_tui.widgets import InputRouter
+
+    adapter = RecordingTerminalAdapter()
+    router = InputRouter(
+        game=make_test_game(),
+        terminal_adapter=adapter,
+        focus=PaneFocus.CODEX,
+    )
+
+    assert router.handle_key("ctrl+c") is True
+    assert adapter.inputs == [b"\x03"]
+
+
+def test_widget_rendering_exposes_focus_and_status_for_shell_consumption() -> None:
+    from codex_sokoban_tui.focus import PaneFocus
+    from codex_sokoban_tui.widgets import (
+        CodexPaneWidget,
+        SokobanWidget,
+        StatusBarWidget,
+    )
+
+    codex_view = CodexPaneWidget().render(
+        buffer_lines=["$ help"],
+        focused=False,
+        status="running",
+    )
+    assert codex_view.title == "Codex"
+    assert codex_view.focused is False
+    assert codex_view.lines == ("$ help",)
+    assert codex_view.status == "running"
+
+    game_view = SokobanWidget().render(game=make_test_game(), focused=True)
+    assert game_view.title == "Sokoban"
+    assert game_view.focused is True
+    assert game_view.lines == ("#####", "#@$.#", "#####")
+    assert game_view.status == "Moves: 0 | Pushes: 0"
+
+    status_line = StatusBarWidget().render(
+        focus=PaneFocus.GAME,
+        game=make_test_game(),
+        terminal_status="running",
+    )
+    assert "Focus: GAME" in status_line
+    assert "Moves: 0" in status_line
+    assert "Pushes: 0" in status_line
+    assert "Codex: running" in status_line

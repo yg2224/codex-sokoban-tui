@@ -14,6 +14,10 @@ _MOVEMENT_KEYS: dict[str, str] = {
     "down": "down",
     "left": "left",
     "right": "right",
+    "w": "up",
+    "s": "down",
+    "a": "left",
+    "d": "right",
 }
 
 
@@ -94,12 +98,25 @@ class InputRouter:
             self.terminal_adapter.send_input(b"\x03")
             return True
 
+        if self.focus is PaneFocus.CODEX:
+            terminal_input = _translate_terminal_input(key)
+            if terminal_input is None:
+                return False
+            self.terminal_adapter.send_input(terminal_input)
+            return True
+
         direction = _MOVEMENT_KEYS.get(normalized)
         if direction is None or self.focus is not PaneFocus.GAME:
             return False
 
         self.game.move(direction)
         return True
+
+
+def _translate_terminal_input(key: str) -> bytes | None:
+    if len(key) == 1:
+        return key.encode("utf-8")
+    return None
 
 
 def _render_game_map(game: GameState) -> list[str]:

@@ -310,6 +310,43 @@ def test_ctrl_c_is_forwarded_to_terminal_when_codex_is_focused() -> None:
     assert adapter.inputs == [b"\x03"]
 
 
+def test_plain_input_is_forwarded_to_terminal_when_codex_is_focused() -> None:
+    from codex_sokoban_tui.focus import PaneFocus
+    from codex_sokoban_tui.widgets import InputRouter
+
+    adapter = RecordingTerminalAdapter()
+    game = make_test_game()
+    starting_player = game.player
+    router = InputRouter(
+        game=game,
+        terminal_adapter=adapter,
+        focus=PaneFocus.CODEX,
+    )
+
+    assert router.handle_key("x") is True
+    assert adapter.inputs == [b"x"]
+    assert game.player == starting_player
+    assert game.move_count == 0
+
+
+def test_wasd_keys_move_player_when_game_is_focused() -> None:
+    from codex_sokoban_tui.focus import PaneFocus
+    from codex_sokoban_tui.widgets import InputRouter
+
+    game = make_test_game()
+    router = InputRouter(
+        game=game,
+        terminal_adapter=RecordingTerminalAdapter(),
+        focus=PaneFocus.GAME,
+    )
+
+    assert router.handle_key("d") is True
+    assert game.player == (2, 1)
+    assert game.boxes == {(3, 1)}
+    assert game.move_count == 1
+    assert game.push_count == 1
+
+
 def test_widget_rendering_exposes_focus_and_status_for_shell_consumption() -> None:
     from codex_sokoban_tui.focus import PaneFocus
     from codex_sokoban_tui.widgets import (

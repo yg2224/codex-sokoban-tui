@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 from dataclasses import dataclass
 
 import pyte
@@ -13,12 +14,13 @@ class TerminalBuffer:
     def __post_init__(self) -> None:
         self._screen = pyte.Screen(self.columns, self.rows)
         self._stream = pyte.Stream(self._screen)
+        self._decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
 
     def feed(self, data: str) -> None:
         self._stream.feed(data)
 
     def feed_bytes(self, data: bytes) -> None:
-        self.feed(data.decode("utf-8", errors="replace"))
+        self.feed(self._decoder.decode(data))
 
     def resize(self, columns: int, rows: int) -> None:
         self._screen.resize(rows, columns)

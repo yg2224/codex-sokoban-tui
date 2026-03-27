@@ -3,19 +3,10 @@ import shutil
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from codex_sokoban_tui import launcher
 from codex_sokoban_tui.wt_command import build_wt_command
-
-
-def _contains_subsequence(items: list[str], subsequence: list[str]) -> bool:
-    """Check whether `items` contains `subsequence` as a contiguous segment."""
-    if len(subsequence) == 0:
-        return True
-
-    for i in range(len(items) - len(subsequence) + 1):
-        if items[i : i + len(subsequence)] == subsequence:
-            return True
-    return False
 
 
 def test_check_requirements_requires_wt() -> None:
@@ -63,36 +54,81 @@ def test_build_wt_command_left_and_right_panes() -> None:
     project_dir = Path("/tmp/project")
     command = build_wt_command(project_dir=project_dir, python_executable="python")
 
-    assert command[0] == "wt"
-    left_command_index = command.index("codex")
-    split_pane_index = command.index("split-pane")
-    assert left_command_index < split_pane_index
-    assert _contains_subsequence(
-        command,
-        ["python", "-m", "codex_sokoban_tui.snake_terminal"],
-    )
+    assert command == [
+        "wt",
+        "new-tab",
+        "-d",
+        str(project_dir),
+        "codex",
+        ";",
+        "split-pane",
+        "-V",
+        "-d",
+        str(project_dir),
+        "python",
+        "-m",
+        "codex_sokoban_tui.snake_terminal",
+    ]
 
 
-def test_launcher_main_calls_subprocess_run_with_wt_command() -> None:
-    original_check_requirements = launcher.check_requirements
-    original_build_wt_command = launcher.build_wt_command
-    original_subprocess_run = launcher.subprocess.run
+def test_launcher_main_uses_current_working_directory(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = {}
 
+    monkeypatch.setattr(launcher, "check_requirements", lambda: None)
+    monkeypatch.setattr(launcher, "build_wt_command", lambda **kwargs: captured.update(kwargs) or ["wt"])
+    monkeypatch.setattr(launcher.subprocess, "run", lambda command, check=False: MagicMock(returncode=0))
+
+    launcher.main()
+
+    assert captured["project_dir"] == Path.cwd().resolve()
+
+
+def test_launcher_main_calls_subprocess_run_with_wt_command(monkeypatch: pytest.MonkeyPatch) -> None:
     expected_command = ["wt", "new-tab", "codex"]
     fake_result = MagicMock(returncode=0)
     captured = {}
 
-    launcher.check_requirements = lambda: None
-    launcher.build_wt_command = lambda *, project_dir, python_executable: expected_command
-    launcher.subprocess.run = lambda command, check=False: captured.update(
-        {"command": command}
-    ) or fake_result
+    monkeypatch.setattr(launcher, "check_requirements", lambda: None)
+    monkeypatch.setattr(
+        launcher,
+        "build_wt_command",
+        lambda *, project_dir, python_executable: expected_command,
+    )
+    monkeypatch.setattr(
+        launcher.subprocess,
+        "run",
+        lambda command, check=False: captured.update({"command": command}) or fake_result,
+    )
 
-    try:
-        assert launcher.main() is None
-    finally:
-        launcher.check_requirements = original_check_requirements
-        launcher.build_wt_command = original_build_wt_command
-        launcher.subprocess.run = original_subprocess_run
+    assert launcher.main() is None
 
     assert captured["command"] == expected_command
+
+
+def test_launcher_main_raises_when_requirement_check_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(launcher, "check_requirements", lambda: "Windows Terminal (wt) is required")
+
+    with pytest.raises(SystemExit, match="Windows Terminal \\(wt\\) is required"):
+        launcher.main()
+
+
+def test_launcher_main_raises_when_subprocess_run_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(launcher, "check_requirements", lambda: None)
+    monkeypatch.setattr(launcher, "build_wt_command", lambda **kwargs: ["wt"])
+
+    def raise_os_error(command: list[str], check: bool = False) -> MagicMock:
+        raise OSError("boom")
+
+    monkeypatch.setattr(launcher.subprocess, "run", raise_os_error)
+
+    with pytest.raises(SystemExit, match="Failed to launch Windows Terminal:"):
+        launcher.main()
+
+
+def test_launcher_main_raises_when_wt_exits_nonzero(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(launcher, "check_requirements", lambda: None)
+    monkeypatch.setattr(launcher, "build_wt_command", lambda **kwargs: ["wt"])
+    monkeypatch.setattr(launcher.subprocess, "run", lambda command, check=False: MagicMock(returncode=3))
+
+    with pytest.raises(SystemExit, match="exit code: 3"):
+        launcher.main()

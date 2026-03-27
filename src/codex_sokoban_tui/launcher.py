@@ -19,13 +19,18 @@ def check_requirements() -> str | None:
     return None
 
 
+def get_project_dir() -> Path:
+    """Use the caller's current working directory as the launch target."""
+    return Path.cwd().resolve()
+
+
 def main() -> None:
     """Entry point for `codex-snake`."""
     requirement_error = check_requirements()
     if requirement_error is not None:
         raise SystemExit(requirement_error)
 
-    project_dir = Path(__file__).resolve().parents[2]
+    project_dir = get_project_dir()
     command = build_wt_command(
         project_dir=project_dir,
         python_executable=sys.executable,

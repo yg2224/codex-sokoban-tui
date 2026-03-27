@@ -1,3 +1,5 @@
+import pytest
+
 from codex_sokoban_tui.sokoban import GameState, MoveResult, load_builtin_level, load_level
 
 
@@ -115,5 +117,54 @@ def test_load_builtin_level_selects_requested_map() -> None:
     state = load_builtin_level(1)
 
     assert state.level_index == 1
-    assert state.player == (3, 1)
-    assert state.boxes == {(4, 1)}
+    assert state.player == (1, 1)
+
+    assert state.move("right") is MoveResult.MOVED
+    assert state.move("right") is MoveResult.PUSHED
+    assert state.is_complete is True
+
+
+def test_plus_and_star_tiles_preserve_goal_semantics() -> None:
+    state = load_level([
+        "#####",
+        "#+* #",
+        "#####",
+    ])
+
+    assert state.player == (1, 1)
+    assert state.boxes == {(2, 1)}
+    assert state.goals == {(1, 1), (2, 1)}
+    assert state.is_complete is True
+
+
+def test_missing_cells_in_ragged_rows_are_not_walkable() -> None:
+    state = load_level([
+        "#####",
+        "#@ ",
+        "#####",
+    ])
+
+    assert state.move("right") is MoveResult.MOVED
+    assert state.move("right") is MoveResult.BLOCKED
+    assert state.player == (2, 1)
+    assert state.move_count == 1
+
+
+@pytest.mark.parametrize(
+    ("lines",),
+    [
+        ([
+            "#####",
+            "#@@.#",
+            "#####",
+        ],),
+        ([
+            "#####",
+            "#+@.#",
+            "#####",
+        ],),
+    ],
+)
+def test_load_level_rejects_multiple_players(lines: list[str]) -> None:
+    with pytest.raises(ValueError, match="exactly one player"):
+        load_level(lines)

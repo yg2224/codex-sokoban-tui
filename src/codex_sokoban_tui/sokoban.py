@@ -28,6 +28,7 @@ class MoveResult(str, Enum):
 class GameState:
     width: int
     height: int
+    row_lengths: tuple[int, ...]
     walls: frozenset[Position]
     goals: frozenset[Position]
     boxes: set[Position]
@@ -76,7 +77,9 @@ class GameState:
 
     def _is_blocked(self, position: Position) -> bool:
         x, y = position
-        if x < 0 or y < 0 or x >= self.width or y >= self.height:
+        if x < 0 or y < 0 or y >= self.height:
+            return True
+        if x >= self.row_lengths[y]:
             return True
         return position in self.walls
 
@@ -88,10 +91,12 @@ def load_level(lines: Iterable[str]) -> GameState:
 
     width = max(len(row) for row in grid)
     height = len(grid)
+    row_lengths = tuple(len(row) for row in grid)
     walls: set[Position] = set()
     goals: set[Position] = set()
     boxes: set[Position] = set()
     player: Position | None = None
+    player_count = 0
 
     for y, row in enumerate(grid):
         for x, tile in enumerate(row):
@@ -102,11 +107,17 @@ def load_level(lines: Iterable[str]) -> GameState:
             elif tile == "$":
                 boxes.add((x, y))
             elif tile == "@":
+                player_count += 1
+                if player_count > 1:
+                    raise ValueError("level must include exactly one player")
                 player = (x, y)
             elif tile == "*":
                 goals.add((x, y))
                 boxes.add((x, y))
             elif tile == "+":
+                player_count += 1
+                if player_count > 1:
+                    raise ValueError("level must include exactly one player")
                 goals.add((x, y))
                 player = (x, y)
             elif tile == " ":
@@ -114,12 +125,13 @@ def load_level(lines: Iterable[str]) -> GameState:
             else:
                 raise ValueError(f"unknown tile: {tile!r}")
 
-    if player is None:
-        raise ValueError("level must include a player")
+    if player_count != 1 or player is None:
+        raise ValueError("level must include exactly one player")
 
     return GameState(
         width=width,
         height=height,
+        row_lengths=row_lengths,
         walls=frozenset(walls),
         goals=frozenset(goals),
         boxes=boxes,

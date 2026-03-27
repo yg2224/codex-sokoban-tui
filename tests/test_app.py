@@ -1,4 +1,4 @@
-from codex_sokoban_tui.terminal_adapter import TerminalAdapter
+from codex_sokoban_tui.terminal_adapter import TerminalAdapter, _PtyBackend
 
 
 class FakeBackend:
@@ -25,6 +25,25 @@ class FakeBackend:
         return True
 
 
+class StrOnlyPtyProcess:
+    def __init__(self) -> None:
+        self.writes: list[str] = []
+
+    def read(self, size: int = 4096) -> bytes:
+        return b""
+
+    def write(self, data: str) -> None:
+        if not isinstance(data, str):
+            raise TypeError("write() argument must be str, not bytes")
+        self.writes.append(data)
+
+    def setwinsize(self, rows: int, columns: int) -> None:
+        return None
+
+    def terminate(self) -> bool:
+        return True
+
+
 def test_adapter_reports_missing_codex_binary() -> None:
     adapter = TerminalAdapter(command=["__missing_codex__"])
 
@@ -46,6 +65,28 @@ def test_adapter_forwards_input_to_backend() -> None:
     adapter.send_input(b"\x1b[A")
 
     assert backend.writes == [b"\x1b[A"]
+
+
+def test_default_pty_backend_converts_input_bytes_for_str_only_process() -> None:
+    process = StrOnlyPtyProcess()
+    backend = _PtyBackend(process)
+
+    written = backend.write(b"\x1b[A")
+    backend.terminate()
+
+    assert written == 3
+    assert process.writes == ["\x1b[A"]
+
+
+def test_default_pty_backend_decodes_utf8_input_before_writing() -> None:
+    process = StrOnlyPtyProcess()
+    backend = _PtyBackend(process)
+
+    written = backend.write("h\u00e9".encode("utf-8"))
+    backend.terminate()
+
+    assert written == 3
+    assert process.writes == ["h\u00e9"]
 
 
 def test_adapter_forwards_resize_to_backend() -> None:

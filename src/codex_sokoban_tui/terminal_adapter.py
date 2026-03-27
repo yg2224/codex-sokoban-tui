@@ -37,6 +37,12 @@ class _PtyBackend:
         self._reader = threading.Thread(target=self._read_forever, daemon=True)
         self._reader.start()
 
+    @staticmethod
+    def _decode_input_bytes(data: bytes) -> str:
+        # Textual/TUI 输入在 adapter 边界保持原始 bytes，
+        # 但 pywinpty 的写接口是 str，因此默认 PTY backend 明确按 UTF-8 解码。
+        return data.decode("utf-8")
+
     def _read_forever(self) -> None:
         while not self._closed.is_set():
             try:
@@ -52,7 +58,7 @@ class _PtyBackend:
         self._closed.set()
 
     def write(self, data: bytes) -> int:
-        self._process.write(data)
+        self._process.write(self._decode_input_bytes(data))
         return len(data)
 
     def read(self, size: int = 4096) -> bytes | str:

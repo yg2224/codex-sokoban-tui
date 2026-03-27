@@ -1,4 +1,5 @@
 import builtins
+import base64
 import sys
 import types
 from pathlib import Path
@@ -57,7 +58,10 @@ def test_build_wt_command_left_and_right_panes() -> None:
     project_dir = Path("/tmp/project")
     command = build_wt_command(project_dir=project_dir, python_executable="python")
 
-    assert command == [
+    encoded_script = command[-1]
+    decoded_script = base64.b64decode(encoded_script).decode("utf-16-le")
+
+    assert command[:-1] == [
         "wt",
         "new-tab",
         "-d",
@@ -73,9 +77,11 @@ def test_build_wt_command_left_and_right_panes() -> None:
         str(project_dir),
         "powershell.exe",
         "-NoExit",
-        "-Command",
-        f"$env:PYTHONPATH = '{project_dir / 'src'}'; python -m codex_sokoban_tui.snake_terminal",
+        "-EncodedCommand",
     ]
+    assert "$env:PYTHONPATH" in decoded_script
+    assert str(project_dir / "src") in decoded_script
+    assert "python -m codex_sokoban_tui.snake_terminal" in decoded_script
 
 
 def test_launcher_main_uses_current_working_directory(monkeypatch: pytest.MonkeyPatch) -> None:

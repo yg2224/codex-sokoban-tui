@@ -1,6 +1,11 @@
 """Build Windows Terminal command arguments for starting Codex and Snake."""
 
+import base64
 from pathlib import Path
+
+
+def _encode_powershell_command(script: str) -> str:
+    return base64.b64encode(script.encode("utf-16-le")).decode("ascii")
 
 
 def build_wt_command(*, project_dir: Path, python_executable: str) -> list[str]:
@@ -11,7 +16,8 @@ def build_wt_command(*, project_dir: Path, python_executable: str) -> list[str]:
     """
     cwd = str(project_dir)
     src_dir = project_dir / "src"
-    snake_command = f"$env:PYTHONPATH = '{src_dir}'; {python_executable} -m codex_sokoban_tui.snake_terminal"
+    snake_script = f"$env:PYTHONPATH = '{src_dir}'\n{python_executable} -m codex_sokoban_tui.snake_terminal"
+    snake_command = _encode_powershell_command(snake_script)
     return [
         "wt",
         "new-tab",
@@ -28,6 +34,6 @@ def build_wt_command(*, project_dir: Path, python_executable: str) -> list[str]:
         cwd,
         "powershell.exe",
         "-NoExit",
-        "-Command",
+        "-EncodedCommand",
         snake_command,
     ]

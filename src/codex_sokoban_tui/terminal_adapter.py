@@ -39,9 +39,13 @@ class _PtyBackend:
 
     @staticmethod
     def _decode_input_bytes(data: bytes) -> str:
-        # Textual/TUI 输入在 adapter 边界保持原始 bytes，
-        # 但 pywinpty 的写接口是 str，因此默认 PTY backend 明确按 UTF-8 解码。
-        return data.decode("utf-8")
+        # pywinpty 的 PtyProcess.write() 只接收 str，无法真正透传原始 bytes。
+        # 默认策略优先把合法 UTF-8 输入还原成文本；如果不是合法 UTF-8，
+        # 再退回 latin-1 的 1:1 字节到码点映射，避免默认 backend 抛解码错误。
+        try:
+            return data.decode("utf-8")
+        except UnicodeDecodeError:
+            return data.decode("latin-1")
 
     def _read_forever(self) -> None:
         while not self._closed.is_set():

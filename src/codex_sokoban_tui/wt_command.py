@@ -11,21 +11,23 @@ def build_wt_command(*, project_dir: Path, python_executable: str) -> list[str]:
     """
     cwd = str(project_dir)
     src_dir = project_dir / "src"
-    snake_command = f'set "PYTHONPATH={src_dir}" && {python_executable} -m codex_sokoban_tui.snake_terminal'
+    snake_command = f"$env:PYTHONPATH = '{src_dir}'; {python_executable} -m codex_sokoban_tui.snake_terminal"
     return [
         "wt",
         "new-tab",
         "-d",
         cwd,
-        "cmd.exe",
-        "/k",
+        "powershell.exe",
+        "-NoExit",
+        "-Command",
         "codex",
         ";",
         "split-pane",
         "-V",
         "-d",
         cwd,
-        "cmd.exe",
-        "/k",
+        "powershell.exe",
+        "-NoExit",
+        "-Command",
         snake_command,
     ]

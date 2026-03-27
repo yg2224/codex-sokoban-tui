@@ -3,15 +3,18 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "codex-sokoban-tui"
+name = "codex-snake"
 version = "0.1.0"
-description = "Single-terminal Textual app with Codex on the left and Sokoban on the right"
+description = "Windows Terminal launcher for native Codex and Snake"
 requires-python = ">=3.12"
 dependencies = [
   "textual>=2.1.2,<3",
   "pyte>=0.8.2,<1",
   "pywinpty>=2.0.15,<3; platform_system == 'Windows'",
 ]
+
+[project.scripts]
+codex-snake = "codex_sokoban_tui.launcher:main"
 
 [project.optional-dependencies]
 dev = [

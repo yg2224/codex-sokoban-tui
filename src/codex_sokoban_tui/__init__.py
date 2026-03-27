@@ -1,3 +1,1 @@
-"""codex_sokoban_tui package."""
-
-__all__ = []
+"""Package marker for codex_sokoban_tui."""

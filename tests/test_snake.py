@@ -43,6 +43,10 @@ def test_map_key_to_action_supports_arrow_keys_and_wasd() -> None:
     assert map_key_to_action("down") is Direction.DOWN
     assert map_key_to_action("left") is Direction.LEFT
     assert map_key_to_action("right") is Direction.RIGHT
+    assert map_key_to_action("\xe0h") is Direction.UP
+    assert map_key_to_action("\xe0p") is Direction.DOWN
+    assert map_key_to_action("\xe0k") is Direction.LEFT
+    assert map_key_to_action("\xe0m") is Direction.RIGHT
     assert map_key_to_action("w") is Direction.UP
     assert map_key_to_action("a") is Direction.LEFT
     assert map_key_to_action("s") is Direction.DOWN

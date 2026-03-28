@@ -73,15 +73,16 @@ def test_build_wt_command_left_and_right_panes() -> None:
         ";",
         "split-pane",
         "-V",
+        "-s",
+        ".25",
         "-d",
         str(project_dir),
         "powershell.exe",
         "-NoExit",
         "-EncodedCommand",
     ]
-    assert "$env:PYTHONPATH" in decoded_script
-    assert str(project_dir / "src") in decoded_script
     assert "python -m codex_sokoban_tui.snake_terminal" in decoded_script
+    assert "$env:PYTHONPATH" not in decoded_script
 
 
 def test_launcher_main_uses_current_working_directory(monkeypatch: pytest.MonkeyPatch) -> None:

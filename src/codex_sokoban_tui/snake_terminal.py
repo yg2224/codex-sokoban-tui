@@ -57,10 +57,15 @@ def map_key_to_action(key: str) -> Action:
     return None
 
 
+def _fit_line(text: str, width: int) -> str:
+    if len(text) < width:
+        return text.ljust(width)
+    return text[:width]
+
+
 def _required_frame_size(game: SnakeGame) -> tuple[int, int]:
-    score_line = f"Score: {game.score}"
-    required_width = max(game.width + 2, len(score_line))
-    required_height = game.height + 3
+    required_width = game.width + 2
+    required_height = game.height + 4
     return required_width, required_height
 
 
@@ -81,15 +86,12 @@ def render_frame(game: SnakeGame, width: int, height: int) -> str:
 
     score_line = f"Score: {game.score}"
     if game.game_over:
-        score_line = f"{score_line} | GAME OVER"
-    if len(score_line) < width:
-        score_line = score_line.ljust(width)
-    elif len(score_line) > width:
-        score_line = score_line[:width]
+        score_line = f"{score_line} | GAME OVER | R restart | Q quit | Alt+F pane"
+    controls_line = "Move: WASD/Arrows | R restart | Q quit | Alt+F pane"
 
     border = "+" + ("-" * board_width) + "+"
 
-    lines: list[str] = [score_line]
+    lines: list[str] = [_fit_line(score_line, width), _fit_line(controls_line, width)]
     lines.append(border)
     head = game.snake[0] if game.snake else None
     for y in range(board_height):

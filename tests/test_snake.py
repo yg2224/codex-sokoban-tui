@@ -88,12 +88,33 @@ def test_render_frame_contains_score_and_border() -> None:
         game_over=False,
     )
 
-    frame = render_frame(game, width=10, height=10)
+    frame = render_frame(game, width=80, height=10)
     lines = frame.splitlines()
 
     assert "Score: 7" in frame
+    assert "R restart" in frame
+    assert "Alt+F pane" in frame
     assert any(line.startswith("+") and line.endswith("+") for line in lines)
     assert any(line.startswith("|") and line.endswith("|") for line in lines)
+
+
+def test_render_frame_game_over_mentions_restart_and_focus_switch() -> None:
+    game = SnakeGame(
+        width=3,
+        height=3,
+        snake=((1, 1),),
+        direction=Direction.RIGHT,
+        rng=Random(0),
+        initial_food=(0, 0),
+        score=7,
+        game_over=True,
+    )
+
+    frame = render_frame(game, width=80, height=10)
+
+    assert "GAME OVER" in frame
+    assert "R restart" in frame
+    assert "Alt+F pane" in frame
 
 
 def test_collision_with_wall_sets_game_over() -> None:

@@ -15,8 +15,7 @@ def build_wt_command(*, project_dir: Path, python_executable: str) -> list[str]:
     `python -m codex_sokoban_tui.snake_terminal`.
     """
     cwd = str(project_dir)
-    src_dir = project_dir / "src"
-    snake_script = f"$env:PYTHONPATH = '{src_dir}'\n{python_executable} -m codex_sokoban_tui.snake_terminal"
+    snake_script = f"{python_executable} -m codex_sokoban_tui.snake_terminal"
     snake_command = _encode_powershell_command(snake_script)
     return [
         "wt",
@@ -30,6 +29,8 @@ def build_wt_command(*, project_dir: Path, python_executable: str) -> list[str]:
         ";",
         "split-pane",
         "-V",
+        "-s",
+        ".25",
         "-d",
         cwd,
         "powershell.exe",
